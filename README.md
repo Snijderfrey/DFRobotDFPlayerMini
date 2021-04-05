@@ -1,3 +1,6 @@
+# Original readme below
+Original DFRobotDFPlayerMini library is modified in order to allow more flexible playback options. Currently, we are in a very early development stage, so the usage of the new functions is not very starightforward. However, all original functions are still fully functional. 
+
 # DFPlayer - A Mini MP3 Player For Arduino
 
 
