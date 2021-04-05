@@ -65,7 +65,12 @@
 #define Stack_CheckSum 7
 #define Stack_End 9
 
-class DFRobotDFPlayerMini {
+//Added for playlist playback
+#define MAX_PLAYLIST 50
+#define PLAYING_PIN 4
+/////////////////////////////
+
+class DFRobotDFPlayerMini2 {
   Stream* _serial;
   
   unsigned long _timeOutTimer;
@@ -90,12 +95,19 @@ class DFRobotDFPlayerMini {
   
   uint16_t calculateCheckSum(uint8_t *buffer);
   
-
-
   void parseStack();
   bool validateStack();
   
   uint8_t device = DFPLAYER_DEVICE_SD;
+  
+  //Added for playlist playback
+  byte curr_track_nr = 1;
+  byte curr_playlist = 1;
+  bool playing = false;
+  bool pausing = false;
+  int file_counts[MAX_PLAYLIST];
+  byte play_status;
+  /////////////////////////////
   
   public:
   
@@ -149,6 +161,19 @@ class DFRobotDFPlayerMini {
   void pause();
   
   void playFolder(uint8_t folderNumber, uint8_t fileNumber);
+    
+  //Added for playlist playback
+  void get_file_counts();
+  void change_playlist(byte playlist);
+  void playPlaylist(bool hard_stop);
+  void stop_playback(bool hard_stop);
+  void next_track();
+  void prev_track();
+  void pause_resume();
+  byte read_play_status_from_pin();
+  bool is_playing();
+  bool check_automatic_playback();
+  /////////////////////////////
   
   void outputSetting(bool enable, uint8_t gain);
   
