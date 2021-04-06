@@ -115,6 +115,11 @@ bool DFRobotDFPlayerMini2::begin(Stream &stream, bool isACK, bool doReset){
     _handleType = DFPlayerCardOnline;
   }
 
+  pl_mode_curr_track = 1;
+  pl_mode_curr_playlist = 1;
+  playlist_mode = false;
+  pl_mode_pausing = false;
+  
   return (readType() == DFPlayerCardOnline) || (readType() == DFPlayerUSBOnline) || !isACK;
 }
 
@@ -345,20 +350,6 @@ void DFRobotDFPlayerMini2::playFolder(uint8_t folderNumber, uint8_t fileNumber){
   sendStack(0x0F, folderNumber, fileNumber);
 }
 
-void DFRobotDFPlayerMini2::playPlaylist(bool hard_stop) {
-  if (curr_track_nr <= file_counts[curr_playlist-1]) {
-//    delay_timer.start_timer();
-    playFolder(curr_playlist+2, curr_track_nr);
-    Serial.print("Playing track: ");
-    Serial.println(curr_track_nr);
-    playing = true;
-    pausing = false;
-  } else {
-    stop_playback(hard_stop);
-    playFolder(1, 2);
-  }
-}
-
 void DFRobotDFPlayerMini2::outputSetting(bool enable, uint8_t gain){
   sendStack(0x10, enable, gain);
 }
@@ -525,108 +516,6 @@ int DFRobotDFPlayerMini2::readFileCountsInFolder(int folderNumber){
   }
 }
 
-void DFRobotDFPlayerMini2::stop_playback(bool hard_stop) {
-  playing = false;
-  pausing = false;
-  curr_track_nr = 1;
-  //delay_timer.start_timer();
-  if (hard_stop) {
-    stop();
-    playFolder(1, 2);
-    Serial.println("Playing stopped.");
-  }
-}
-
-void DFRobotDFPlayerMini2::get_file_counts() {
-  for (byte ii=0; ii<MAX_PLAYLIST; ii++) {
-    file_counts[ii] = readFileCountsInFolder(ii+3);
-    if (file_counts[ii] == -1) {
-      break;
-    }
-    Serial.print("Files in playlist ");
-    Serial.print(ii+1);
-    Serial.print(": ");
-    Serial.println(file_counts[ii]);
-  }
-}
-
-void DFRobotDFPlayerMini2::change_playlist(byte playlist) {
-  stop_playback(false);
-  curr_playlist = playlist;
-  
-  playFolder(2, curr_playlist);
-  Serial.print("Current playlist: ");
-  Serial.println(curr_playlist);
-  Serial.print("File count ");
-  Serial.println(file_counts[curr_playlist-1]);
-  //Serial.print("Real time file count: ");
-  //Serial.println(file_count_in_folder(curr_playlist+2));
-}
-
-void DFRobotDFPlayerMini2::next_track() {
-  bool last_track;
-  if (curr_track_nr < file_counts[curr_playlist-1]) {
-    last_track = false;
-    curr_track_nr++;
-  } else {
-    last_track = true;
-  }
-
-  if (playing && !last_track) {
-    playPlaylist(false);
-  } else if (!playing && !pausing && !last_track) {
-    playFolder(1, 5);
-  }
-}
-
-void DFRobotDFPlayerMini2::prev_track() {
-  bool first_track;
-  if (curr_track_nr>1) {
-    first_track = false;
-    curr_track_nr--;
-  } else {
-    first_track = true;
-  }
-
-  if (playing) {
-    playPlaylist(false);
-  } else if (!playing && !pausing && !first_track) {
-    playFolder(1, 6);
-  }
-}
-
-void DFRobotDFPlayerMini2::pause_resume() {
-  if (playing && read_play_status_from_pin()) {
-    playing = false;
-    pausing = true;
-    pause();
-    Serial.println("Playback paused.");
-  } else if (!playing && !read_play_status_from_pin() && pausing) {
-    playing = true;
-    pausing = false;
-    start();
-    Serial.println("Playback resumed.");
-  }
-}
-
-byte DFRobotDFPlayerMini2::read_play_status_from_pin() {
-  play_status = !digitalRead(PLAYING_PIN);
-  return play_status;
-}
-
-bool DFRobotDFPlayerMini2::is_playing() {
-  return playing;
-}
-
-bool DFRobotDFPlayerMini2::check_automatic_playback() {
-  if (playing && !read_play_status_from_pin()) {
-    next_track();
-    return true;
-  } else {
-    return false;
-  }
-}
-
 int DFRobotDFPlayerMini2::readFolderCounts(){
   sendStack(0x4F);
   if (waitAvailable()) {
@@ -651,3 +540,178 @@ int DFRobotDFPlayerMini2::readCurrentFileNumber(){
 }
 
 
+// The following methods were added to the original
+// library for playlist mode.
+
+void DFRobotDFPlayerMini2::pl_mode_play_track(bool hard_stop) {
+  if (pl_mode_curr_track <= file_counts[pl_mode_curr_playlist-1]) {
+    playFolder(pl_mode_curr_playlist+2, pl_mode_curr_track);
+    wait_for_status_update(1);
+#ifdef _DEBUG
+    Serial.print("Playing track: ");
+    Serial.println(pl_mode_curr_track);
+#endif
+    playlist_mode = true;
+    pl_mode_pausing = false;
+  } else {
+    pl_mode_stop(hard_stop);
+    playFolder(1, 2);
+  }
+}
+
+void DFRobotDFPlayerMini2::pl_mode_stop(bool hard_stop) {
+  playlist_mode = false;
+  pl_mode_pausing = false;
+  pl_mode_curr_track = 1;
+  if (hard_stop) {
+    stop();
+    playFolder(1, 2);
+    wait_for_status_update(0);
+#ifdef _DEBUG
+    Serial.println("Playing stopped.");
+#endif
+  }
+}
+
+void DFRobotDFPlayerMini2::get_file_counts() {
+  for (byte ii=0; ii<MAX_PLAYLIST; ii++) {
+    file_counts[ii] = readFileCountsInFolder(ii+3);
+    if (file_counts[ii] == -1) {
+      break;
+    }
+    
+#ifdef _DEBUG
+    Serial.print("Files in playlist ");
+    Serial.print(ii+1);
+    Serial.print(": ");
+    Serial.println(file_counts[ii]);
+#endif
+  }
+}
+
+void DFRobotDFPlayerMini2::pl_mode_change_playlist(byte playlist) {
+  pl_mode_stop(false);
+  pl_mode_curr_playlist = playlist;
+  
+  playFolder(2, pl_mode_curr_playlist);
+#ifdef _DEBUG
+  Serial.print("Current playlist: ");
+  Serial.println(pl_mode_curr_playlist);
+  Serial.print("File count ");
+  Serial.println(file_counts[pl_mode_curr_playlist-1]);
+  //Serial.print("Real time file count: ");
+  //Serial.println(file_count_in_folder(pl_mode_curr_playlist+2));
+#endif
+}
+
+void DFRobotDFPlayerMini2::pl_mode_next() {
+  bool last_track;
+  if (pl_mode_curr_track < file_counts[pl_mode_curr_playlist-1]) {
+    last_track = false;
+    pl_mode_curr_track++;
+  } else {
+    last_track = true;
+  }
+
+  if(read_play_status_from_pin() == 1) {
+    stop();
+    wait_for_status_update(0);
+  }
+  
+  if (playlist_mode && !last_track) {
+    pl_mode_play_track(false);
+  } else if (playlist_mode && last_track) {
+    pl_mode_stop(false);
+    playFolder(1, 2);
+  } else if (!playlist_mode && !pl_mode_pausing && !last_track) {
+    playFolder(1, 5);
+  }
+}
+
+void DFRobotDFPlayerMini2::pl_mode_previous() {
+  bool first_track;
+  if (pl_mode_curr_track>1) {
+    first_track = false;
+    pl_mode_curr_track--;
+  } else {
+    first_track = true;
+  }
+
+  if(read_play_status_from_pin() == 1) {
+    stop();
+    wait_for_status_update(0);
+  }
+  
+  if (playlist_mode) {
+    pl_mode_play_track(false);
+  } else if (!playlist_mode && !pl_mode_pausing && !first_track) {
+    playFolder(1, 6);
+  }
+}
+
+void DFRobotDFPlayerMini2::pl_mode_pause_resume() {
+  if (playlist_mode && read_play_status_from_pin()) {
+    playlist_mode = false;
+    pl_mode_pausing = true;
+    pause();
+    wait_for_status_update(0);
+#ifdef _DEBUG
+    Serial.println("Playback paused.");
+#endif
+  } else if (!playlist_mode && !read_play_status_from_pin() && pl_mode_pausing) {
+    playlist_mode = true;
+    pl_mode_pausing = false;
+    start();
+    wait_for_status_update(1);
+#ifdef _DEBUG
+    Serial.println("Playback resumed.");
+#endif
+  }
+}
+
+bool DFRobotDFPlayerMini2::read_play_status_from_pin() {
+  play_status = !digitalRead(PLAYING_PIN);
+  return play_status;
+}
+
+bool DFRobotDFPlayerMini2::pl_mode_is_active() {
+  return playlist_mode;
+}
+
+bool DFRobotDFPlayerMini2::pl_mode_check_playback() {
+  if (playlist_mode && !read_play_status_from_pin()) {
+    pl_mode_next();
+    return true;
+  } else {
+    return false;
+  }
+}
+
+unsigned long DFRobotDFPlayerMini2::wait_for_status_update(bool next_status) {
+  unsigned long timer_start = millis();
+  unsigned long status_update_delay;
+  while (read_play_status_from_pin() != next_status && status_update_delay < 300) {
+    //wait for play status update or timeout
+    status_update_delay = millis() - timer_start;
+  }
+#ifdef _DEBUG
+  bool timeout;
+  if (read_play_status_from_pin() != next_status) {
+    timeout = true;
+  } else {
+    timeout = false;
+  }
+  if (timeout) {
+    Serial.println("Play status update not successful before timeout.");
+  }
+  Serial.print("Play status now ");
+  Serial.print(read_play_status_from_pin());
+  Serial.print(", delay: ");
+  Serial.print(status_update_delay);
+  Serial.print(" ms; (timeout ");
+  Serial.print(timeout);
+  Serial.println(")");
+#endif
+
+  return status_update_delay;
+}
