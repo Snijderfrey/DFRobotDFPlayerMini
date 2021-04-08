@@ -102,12 +102,11 @@ class DFRobotDFPlayerMini2 {
   
   //Added for playlist playback
   byte pl_mode_curr_track;
-  byte pl_mode_curr_playlist;
+  byte pl_mode_curr_folder;
   bool playlist_mode;
   bool pl_mode_pausing;
   int file_counts[MAX_PLAYLIST];
   bool play_status;
-  unsigned long wait_for_status_update(bool next_status);
   /////////////////////////////
   
   public:
@@ -167,13 +166,15 @@ class DFRobotDFPlayerMini2 {
   void get_file_counts();
   bool read_play_status_from_pin();
   bool pl_mode_is_active();
-  void pl_mode_change_playlist(byte playlist);
-  void pl_mode_play_track(bool hard_stop);
+  void pl_mode_change_folder(byte playlist);
+  void pl_mode_play_track();
   void pl_mode_stop(bool hard_stop);
   void pl_mode_next();
   void pl_mode_previous();
   void pl_mode_pause_resume();
   bool pl_mode_check_playback();
+  unsigned long wait_for_status_update(bool next_status);
+  byte pl_mode_read_curr_track();
   /////////////////////////////
   
   void outputSetting(bool enable, uint8_t gain);
