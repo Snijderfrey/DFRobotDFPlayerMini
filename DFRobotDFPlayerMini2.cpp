@@ -600,17 +600,17 @@ void DFRobotDFPlayerMini2::pl_mode_stop(bool hard_stop) {
 }
 
 void DFRobotDFPlayerMini2::get_file_counts() {
-  for (byte ii=0; ii<MAX_PLAYLIST; ii++) {
-    file_counts[ii] = readFileCountsInFolder(ii+1);
-    if (file_counts[ii] == -1) {
+  for (int i=0; i<MAX_PLAYLIST; i++) {
+    file_counts[i] = readFileCountsInFolder(i+1);
+    if (file_counts[i] == -1) {
       break;
     }
     
 #ifdef _DEBUG
     Serial.print("Files in playlist ");
-    Serial.print(ii+1);
+    Serial.print(i+1);
     Serial.print(": ");
-    Serial.println(file_counts[ii]);
+    Serial.println(file_counts[i]);
 #endif
   }
 }
@@ -625,8 +625,9 @@ void DFRobotDFPlayerMini2::pl_mode_change_folder(byte playlist) {
   Serial.println(pl_mode_curr_folder);
   Serial.print("File count ");
   Serial.println(file_counts[pl_mode_curr_folder-1]);
-  /*Serial.print("Real time file count: ");
-  Serial.println(readFileCountsInFolder(pl_mode_curr_folder));*/
+  //delay(100);
+  //Serial.print("Real time file count: ");
+  //Serial.println(readFileCountsInFolder(pl_mode_curr_folder));
 #endif
 }
 
