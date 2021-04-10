@@ -119,6 +119,8 @@ bool DFRobotDFPlayerMini2::begin(Stream &stream, bool isACK, bool doReset){
   pl_mode_curr_folder = 1;
   playlist_mode = false;
   pl_mode_pausing = false;
+  pl_mode_halted = false;
+  pl_mode_announcing = false;
   
   return (readType() == DFPlayerCardOnline) || (readType() == DFPlayerUSBOnline) || !isACK;
 }
@@ -571,10 +573,21 @@ int DFRobotDFPlayerMini2::readCurrentFileNumber(){
 // The following methods were added to the original
 // library for playlist mode.
 
-void DFRobotDFPlayerMini2::pl_mode_play_track() {
+void DFRobotDFPlayerMini2::pl_mode_play_track(int announce_type) {
+  if (announce_type == 1) {
+    pl_mode_make_announcement(101);
+  } else if (announce_type == 2) {
+    pl_mode_make_announcement(pl_mode_curr_track);
+  }
+  
+  if (pl_mode_announcing) {
+    pl_mode_halted = true;
+    return;
+  }
+
   if (pl_mode_curr_track <= file_counts[pl_mode_curr_folder-1]) {
     playFolder(pl_mode_curr_folder, pl_mode_curr_track);
-    wait_for_status_update(1);
+    wait_for_status_update(1, 300);
 #ifdef _DEBUG
     Serial.print("Playing track: ");
     Serial.println(pl_mode_curr_track);
@@ -582,20 +595,23 @@ void DFRobotDFPlayerMini2::pl_mode_play_track() {
     playlist_mode = true;
     pl_mode_pausing = false;
   } else {
-    pl_mode_stop(false);
+    pl_mode_stop(false, true);
   }
 }
 
-void DFRobotDFPlayerMini2::pl_mode_stop(bool hard_stop) {
+void DFRobotDFPlayerMini2::pl_mode_stop(bool hard_stop, bool announce) {
   playlist_mode = false;
   pl_mode_pausing = false;
   pl_mode_curr_track = 1;
   if (hard_stop) {
     stop();
-    wait_for_status_update(0);
+    wait_for_status_update(0, 300);
 #ifdef _DEBUG
     Serial.println("Playing stopped.");
 #endif
+  }
+  if (announce) {
+    pl_mode_make_announcement(102);
   }
 }
 
@@ -616,7 +632,7 @@ void DFRobotDFPlayerMini2::get_file_counts() {
 }
 
 void DFRobotDFPlayerMini2::pl_mode_change_folder(byte playlist) {
-  pl_mode_stop(false);
+  pl_mode_stop(false, false);
   pl_mode_curr_folder = playlist;
   
   playFolder(pl_mode_curr_folder, 1);
@@ -631,7 +647,7 @@ void DFRobotDFPlayerMini2::pl_mode_change_folder(byte playlist) {
 #endif
 }
 
-void DFRobotDFPlayerMini2::pl_mode_next() {
+void DFRobotDFPlayerMini2::pl_mode_next(bool announce) {
   bool last_track;
   if (pl_mode_curr_track < file_counts[pl_mode_curr_folder-1]) {
     last_track = false;
@@ -642,19 +658,25 @@ void DFRobotDFPlayerMini2::pl_mode_next() {
 
   if(read_play_status_from_pin() == 1) {
     stop();
-    wait_for_status_update(0);
+    wait_for_status_update(0, 300);
+  }
+  
+  if (pl_mode_pausing) {
+    pl_mode_pause_resume(false);
+    stop();
+    wait_for_status_update(0, 300);
   }
   
   if (playlist_mode && !last_track) {
-    pl_mode_play_track();
+    pl_mode_play_track(announce ? 2 : 0);
   } else if (playlist_mode && last_track) {
-    pl_mode_stop(false);
-  } else if (!playlist_mode && !pl_mode_pausing && !last_track) {
-    //playMp3Folder(105);
+    pl_mode_stop(false, true);
+  } else if (!playlist_mode && announce) {
+    pl_mode_make_announcement(pl_mode_curr_track);
   }
 }
 
-void DFRobotDFPlayerMini2::pl_mode_previous() {
+void DFRobotDFPlayerMini2::pl_mode_previous(bool announce) {
   bool first_track;
   if (pl_mode_curr_track>1) {
     first_track = false;
@@ -665,22 +687,31 @@ void DFRobotDFPlayerMini2::pl_mode_previous() {
 
   if(read_play_status_from_pin() == 1) {
     stop();
-    wait_for_status_update(0);
+    wait_for_status_update(0, 300);
+  }
+  
+  if (pl_mode_pausing) {
+    pl_mode_pause_resume(false);
+    stop();
+    wait_for_status_update(0, 300);
   }
   
   if (playlist_mode) {
-    pl_mode_play_track();
-  } else if (!playlist_mode && !pl_mode_pausing && !first_track) {
-    //playMp3Folder(106);
+    pl_mode_play_track(announce ? 2 : 0);
+  } else if (!playlist_mode && announce) {
+    pl_mode_make_announcement(pl_mode_curr_track);
   }
 }
 
-void DFRobotDFPlayerMini2::pl_mode_pause_resume() {
+void DFRobotDFPlayerMini2::pl_mode_pause_resume(bool announce) {
   if (playlist_mode && read_play_status_from_pin()) {
+    if (announce) {
+      advertise(103);
+    }
     playlist_mode = false;
     pl_mode_pausing = true;
     pause();
-    wait_for_status_update(0);
+    wait_for_status_update(0, 300);
 #ifdef _DEBUG
     Serial.println("Playback paused.");
 #endif
@@ -688,11 +719,26 @@ void DFRobotDFPlayerMini2::pl_mode_pause_resume() {
     playlist_mode = true;
     pl_mode_pausing = false;
     start();
-    wait_for_status_update(1);
+    wait_for_status_update(1, 300);
+    if (announce) {
+      advertise(104);
+    }
 #ifdef _DEBUG
     Serial.println("Playback resumed.");
 #endif
   }
+}
+
+void DFRobotDFPlayerMini2::pl_mode_make_announcement(byte ann_nr) {
+  pl_mode_announcing = true;
+  
+  if(read_play_status_from_pin() == 1) {
+    stop();
+    wait_for_status_update(0, 300);
+  }
+  
+  playMp3Folder(ann_nr);
+  wait_for_status_update(1, 300);
 }
 
 bool DFRobotDFPlayerMini2::read_play_status_from_pin() {
@@ -705,22 +751,32 @@ bool DFRobotDFPlayerMini2::pl_mode_is_active() {
 }
 
 bool DFRobotDFPlayerMini2::pl_mode_check_playback() {
-  if (playlist_mode && !read_play_status_from_pin()) {
-    pl_mode_next();
-    return true;
-  } else {
-    return false;
+  if (!read_play_status_from_pin() && pl_mode_announcing) {
+    pl_mode_announcing = false;
   }
+  
+  if (pl_mode_halted && !pl_mode_announcing) {
+    pl_mode_halted = false;
+    pl_mode_play_track(0);
+    return true;
+  }
+  
+  if (playlist_mode && !read_play_status_from_pin() && !pl_mode_pausing && !pl_mode_announcing && !pl_mode_halted) {
+    pl_mode_next(false);
+    return true;
+  }
+  
+  return false;
 }
 
 byte DFRobotDFPlayerMini2::pl_mode_read_curr_track() {
   return pl_mode_curr_track;
 }
 
-unsigned long DFRobotDFPlayerMini2::wait_for_status_update(bool next_status) {
+unsigned int DFRobotDFPlayerMini2::wait_for_status_update(bool next_status, unsigned int max_time) {
   unsigned long timer_start = millis();
-  unsigned long status_update_delay;
-  while (read_play_status_from_pin() != next_status && status_update_delay < 300) {
+  unsigned int status_update_delay = 0;
+  while (read_play_status_from_pin() != next_status && status_update_delay < max_time) {
     //wait for play status update or timeout
     status_update_delay = millis() - timer_start;
   }
