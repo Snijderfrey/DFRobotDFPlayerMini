@@ -575,9 +575,9 @@ int DFRobotDFPlayerMini2::readCurrentFileNumber(){
 
 void DFRobotDFPlayerMini2::pl_mode_play_track(int announce_type) {
   if (announce_type == 1) {
-    pl_mode_make_announcement(101);
+    pl_mode_make_announcement(101, false);
   } else if (announce_type == 2) {
-    pl_mode_make_announcement(pl_mode_curr_track);
+    pl_mode_make_announcement(pl_mode_curr_track, false);
   }
   
   if (pl_mode_announcing) {
@@ -611,7 +611,7 @@ void DFRobotDFPlayerMini2::pl_mode_stop(bool hard_stop, bool announce) {
 #endif
   }
   if (announce) {
-    pl_mode_make_announcement(102);
+    pl_mode_make_announcement(102, false);
   }
 }
 
@@ -619,6 +619,7 @@ void DFRobotDFPlayerMini2::get_file_counts() {
   for (int i=0; i<MAX_PLAYLIST; i++) {
     file_counts[i] = readFileCountsInFolder(i+1);
     if (file_counts[i] == -1) {
+      pl_count = i;
       break;
     }
     
@@ -631,11 +632,13 @@ void DFRobotDFPlayerMini2::get_file_counts() {
   }
 }
 
-void DFRobotDFPlayerMini2::pl_mode_change_folder(byte playlist) {
+void DFRobotDFPlayerMini2::pl_mode_change_folder(byte playlist, bool announce) {
   pl_mode_stop(false, false);
   pl_mode_curr_folder = playlist;
-  
-  playFolder(pl_mode_curr_folder, 1);
+
+  if (announce) {
+    pl_mode_make_announcement(playlist, true);
+  }
 #ifdef _DEBUG
   Serial.print("Current playlist: ");
   Serial.println(pl_mode_curr_folder);
@@ -672,7 +675,7 @@ void DFRobotDFPlayerMini2::pl_mode_next(bool announce) {
   } else if (playlist_mode && last_track) {
     pl_mode_stop(false, true);
   } else if (!playlist_mode && announce) {
-    pl_mode_make_announcement(pl_mode_curr_track);
+    pl_mode_make_announcement(pl_mode_curr_track, false);
   }
 }
 
@@ -699,7 +702,7 @@ void DFRobotDFPlayerMini2::pl_mode_previous(bool announce) {
   if (playlist_mode) {
     pl_mode_play_track(announce ? 2 : 0);
   } else if (!playlist_mode && announce) {
-    pl_mode_make_announcement(pl_mode_curr_track);
+    pl_mode_make_announcement(pl_mode_curr_track, false);
   }
 }
 
@@ -729,7 +732,7 @@ void DFRobotDFPlayerMini2::pl_mode_pause_resume(bool announce) {
   }
 }
 
-void DFRobotDFPlayerMini2::pl_mode_make_announcement(byte ann_nr) {
+void DFRobotDFPlayerMini2::pl_mode_make_announcement(byte ann_nr, bool pl) {
   pl_mode_announcing = true;
   
   if(read_play_status_from_pin() == 1) {
@@ -737,7 +740,11 @@ void DFRobotDFPlayerMini2::pl_mode_make_announcement(byte ann_nr) {
     wait_for_status_update(0, 300);
   }
   
-  playMp3Folder(ann_nr);
+  if (pl) {
+    playFolder(ann_nr, 1);
+  } else {
+    playMp3Folder(ann_nr);
+  }
   wait_for_status_update(1, 300);
 }
 
@@ -771,6 +778,14 @@ bool DFRobotDFPlayerMini2::pl_mode_check_playback() {
 
 byte DFRobotDFPlayerMini2::pl_mode_read_curr_track() {
   return pl_mode_curr_track;
+}
+
+byte DFRobotDFPlayerMini2::pl_mode_read_pl_count() {
+  return pl_count;
+}
+
+byte DFRobotDFPlayerMini2::pl_mode_read_curr_folder() {
+  return pl_mode_curr_folder;
 }
 
 unsigned int DFRobotDFPlayerMini2::wait_for_status_update(bool next_status, unsigned int max_time) {

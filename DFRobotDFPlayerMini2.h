@@ -33,7 +33,7 @@
 #define DFPLAYER_RECEIVED_LENGTH 10
 #define DFPLAYER_SEND_LENGTH 10
 
-#define _DEBUG
+//#define _DEBUG
 
 #define TimeOut 0
 #define WrongStack 1
@@ -107,6 +107,7 @@ class DFRobotDFPlayerMini2 {
   bool pl_mode_pausing;
   bool pl_mode_announcing;
   int file_counts[MAX_PLAYLIST];
+  byte pl_count;
   bool play_status;
   bool pl_mode_halted;
   /////////////////////////////
@@ -168,16 +169,18 @@ class DFRobotDFPlayerMini2 {
   void get_file_counts();
   bool read_play_status_from_pin();
   bool pl_mode_is_active();
-  void pl_mode_change_folder(byte playlist);
-  void pl_mode_play_track(int announce_type);
+  void pl_mode_change_folder(byte playlist, bool announce);
+    void pl_mode_play_track(int announce_type);
   void pl_mode_stop(bool hard_stop, bool announce);
   void pl_mode_next(bool announce);
   void pl_mode_previous(bool announce);
   void pl_mode_pause_resume(bool announce);
-  void pl_mode_make_announcement(byte ann_nr);
+  void pl_mode_make_announcement(byte ann_nr, bool pl);
   bool pl_mode_check_playback();
   unsigned int wait_for_status_update(bool next_status, unsigned int max_time);
   byte pl_mode_read_curr_track();
+  byte pl_mode_read_curr_folder();
+  byte pl_mode_read_pl_count();
   /////////////////////////////
   
   void outputSetting(bool enable, uint8_t gain);
