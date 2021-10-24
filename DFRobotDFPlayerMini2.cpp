@@ -634,10 +634,12 @@ void DFRobotDFPlayerMini2::get_file_counts() {
 
 void DFRobotDFPlayerMini2::pl_mode_change_folder(byte playlist, bool announce) {
   pl_mode_stop(false, false);
-  pl_mode_curr_folder = playlist;
+  if (pl_mode_curr_folder != playlist) {
+    pl_mode_curr_folder = playlist;
 
-  if (announce) {
-    pl_mode_make_announcement(playlist, true);
+    if (announce) {
+      pl_mode_make_announcement(playlist, true);
+    }
   }
 #ifdef _DEBUG
   Serial.print("Current playlist: ");
@@ -732,10 +734,14 @@ void DFRobotDFPlayerMini2::pl_mode_pause_resume(bool announce) {
   }
 }
 
+bool DFRobotDFPlayerMini2::pl_mode_is_pausing() {
+  return pl_mode_pausing;
+}
+
 void DFRobotDFPlayerMini2::pl_mode_make_announcement(byte ann_nr, bool pl) {
   pl_mode_announcing = true;
   
-  if(read_play_status_from_pin() == 1) {
+  if (read_play_status_from_pin() == 1) {
     stop();
     wait_for_status_update(0, 300);
   }

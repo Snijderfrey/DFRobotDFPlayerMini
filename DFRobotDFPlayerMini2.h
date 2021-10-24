@@ -66,7 +66,7 @@
 #define Stack_End 9
 
 //Added for playlist playback
-#define MAX_PLAYLIST 50
+#define MAX_PLAYLIST 255
 #define PLAYING_PIN 4
 /////////////////////////////
 
@@ -170,11 +170,12 @@ class DFRobotDFPlayerMini2 {
   bool read_play_status_from_pin();
   bool pl_mode_is_active();
   void pl_mode_change_folder(byte playlist, bool announce);
-    void pl_mode_play_track(int announce_type);
+  void pl_mode_play_track(int announce_type);
   void pl_mode_stop(bool hard_stop, bool announce);
   void pl_mode_next(bool announce);
   void pl_mode_previous(bool announce);
   void pl_mode_pause_resume(bool announce);
+  bool pl_mode_is_pausing();
   void pl_mode_make_announcement(byte ann_nr, bool pl);
   bool pl_mode_check_playback();
   unsigned int wait_for_status_update(bool next_status, unsigned int max_time);
